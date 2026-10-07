@@ -5,6 +5,21 @@
 // 安全: 私有仓库走 Secret GH_TOKEN; 建议加 CF Access 登录保护
 // ============================================================
 
+// 登录防爆破: 每 IP 5 次失败锁 10 分钟
+const FAILS = new Map();
+function checkFail(ip) {
+  const f = FAILS.get(ip);
+  if (f && f.count >= 5 && Date.now() < f.until) return 600 - Math.ceil((f.until - Date.now()) / 1000);
+  return 0;
+}
+function addFail(ip) {
+  const f = FAILS.get(ip) || { count: 0, until: 0 };
+  f.count++;
+  if (f.count >= 5) f.until = Date.now() + 600000;
+  FAILS.set(ip, f);
+}
+function clearFail(ip) { FAILS.delete(ip); }
+
 const REPO = "Zaienscookie/tjsj-document-together";
 const BRANCH = "main";
 
@@ -17,12 +32,16 @@ export default {
     const cookie = request.headers.get("Cookie") || "";
     const expect = await sha256hex((env.ACCESS_PASS || "") + "::club");
     if (url.pathname === "/api/login" && request.method === "POST") {
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const lock = checkFail(ip);
+      if (lock > 0) return new Response(JSON.stringify({ ok: false, error: "尝试过多，请 " + lock + " 秒后再试" }), { headers: { "Content-Type": "application/json" } });
       const { pass } = await request.json();
-      if (pass === (env.ACCESS_PASS || "")) {
+      if (pass === (env.ACCESS_PASS || "")) { clearFail(ip);
         return new Response(JSON.stringify({ ok: true }), {
           headers: { "Set-Cookie": `club_auth=${expect}; Max-Age=2592000; Path=/; SameSite=Lax`, "Content-Type": "application/json" }
         });
       }
+      addFail(ip);
       return new Response(JSON.stringify({ ok: false, error: "密码错误" }), { headers: { "Content-Type": "application/json" } });
     }
     if (url.pathname === "/api/logout") {
