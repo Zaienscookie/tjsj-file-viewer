@@ -17,6 +17,12 @@ Cloudflare Worker 单文件应用：**文档浏览 + 备忘录 + 便利贴 + 课
 4. **设置 → 自定义域** → `st.zain-dev.top`
 5. 建议：Cloudflare Access 登录保护（社团内部用，免费 50 人）
 
+## 登录验证（内置，无需 CF Access/信用卡）
+- 部署时设置 **Secret: `ACCESS_PASS`** = 社团共享密码
+- 访问网站需输入密码（Cookie 会话 30 天），页面有「退出登录」
+- 顶栏右上角可退出登录
+- 优点：零成本、无信用卡、无外部依赖
+
 ## 安全
 - 私有仓库内容只经 Worker 中转，token 在 Secret 不外泄
-- 建议加 Access 保护防止外部访问
+- 密码登录已内置（ACCESS_PASS），防止外部访问
