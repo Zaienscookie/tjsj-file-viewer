@@ -13,6 +13,26 @@ export default {
     const url = new URL(request.url);
     const token = env.GH_TOKEN || "";
     const h = { Authorization: `Bearer ${token}`, "User-Agent": "club-app" };
+    // ---- 登录校验 (Secret: ACCESS_PASS) ----
+    const cookie = request.headers.get("Cookie") || "";
+    const expect = await sha256hex((env.ACCESS_PASS || "") + "::club");
+    if (url.pathname === "/api/login" && request.method === "POST") {
+      const { pass } = await request.json();
+      if (pass === (env.ACCESS_PASS || "")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Set-Cookie": `club_auth=${expect}; Max-Age=2592000; Path=/; SameSite=Lax`, "Content-Type": "application/json" }
+        });
+      }
+      return new Response(JSON.stringify({ ok: false, error: "密码错误" }), { headers: { "Content-Type": "application/json" } });
+    }
+    if (url.pathname === "/api/logout") {
+      return new Response(JSON.stringify({ ok: true }), { headers: { "Set-Cookie": "club_auth=; Max-Age=0; Path=/", "Content-Type": "application/json" } });
+    }
+    if (!cookie.includes("club_auth=" + expect)) {
+      if (url.pathname === "/api/login") return new Response(JSON.stringify({ ok: false }), { headers: { "Content-Type": "application/json" } });
+      return new Response(LOGIN_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+
     const path = url.pathname;
 
     // ---- 文档浏览 API ----
@@ -99,6 +119,42 @@ function j(obj) {
   return new Response(JSON.stringify(obj), { headers: { "Content-Type": "application/json" } });
 }
 
+async function sha256hex(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const LOGIN_HTML = `<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>社团内部软件 - 登录</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC",sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:20px;padding:40px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.18);text-align:center}
+h1{font-size:20px;margin-bottom:6px;color:#333}
+p{color:#999;font-size:13px;margin-bottom:20px}
+input{width:100%;padding:12px;border:1px solid #d5d8e0;border-radius:10px;font-size:15px;margin-bottom:14px;text-align:center}
+button{width:100%;padding:12px;background:#4a6cf7;color:#fff;border:0;border-radius:10px;font-size:15px;cursor:pointer}
+button:hover{background:#3a5be0}
+#err{color:#c33;font-size:13px;margin-top:10px;display:none}
+</style></head><body>
+<div class="box">
+  <h1>🏫 社团内部软件</h1>
+  <p>请输入访问密码</p>
+  <input type="password" id="pass" placeholder="密码" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">登 录</button>
+  <div id="err">密码错误，请重试</div>
+</div>
+<script>
+async function login(){
+  const pass=document.getElementById("pass").value;
+  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pass})});
+  const d=await r.json();
+  if(d.ok){location.reload();}else{document.getElementById("err").style.display="block";}
+}
+</script></body></html>`;
+
+
 const HTML = `<!DOCTYPE html><html lang="zh-CN"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>社团内部软件</title>
@@ -168,6 +224,7 @@ textarea{min-height:80px;resize:vertical}
   <span class="tab" data-tab="memo" onclick="switchTab('memo')">📝 备忘录</span>
   <span class="tab" data-tab="note" onclick="switchTab('note')">📌 便利贴</span>
   <span class="tab" data-tab="sched" onclick="switchTab('sched')">📅 课表</span>
+  <span style="margin-left:auto;color:#cbd5e1;cursor:pointer;font-size:13px" onclick="logout()">退出登录 ↩</span>
 </div>
 
 <!-- 文档 -->
@@ -220,6 +277,7 @@ textarea{min-height:80px;resize:vertical}
 <div id="loading">加载中…</div>
 
 <script>
+function logout(){ fetch("/api/logout").then(()=>location.reload()); }
 // ===== Tab 切换 =====
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
