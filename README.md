@@ -1,18 +1,22 @@
-# TJSJ 文档库 - 在线文件浏览器
+# 社团内部软件 (st.zain-dev.top)
 
-Cloudflare Worker：私有 GitHub 仓库（tjsj-document-together）的在线文件浏览器。
+Cloudflare Worker 单文件应用：**文档浏览 + 备忘录 + 便利贴 + 课表（多班级）**
 
 ## 功能
-- 📂 树状目录 + 文件列表
-- 📄 在线预览：md / pdf / 图片 / **docx** / **xlsx** / txt / csv
-- ⬇ 一键下载（含 GitHub 不支持预览的文件）
-- 🔒 私有仓库通过 Secret 读取，token 不外泄
+| Tab | 功能 | 数据源 |
+|---|---|---|
+| 📂 文档 | 树状浏览 tjsj-document-together 私有仓库，md/pdf/docx/xlsx 在线预览 + 下载 | GitHub API (GH_TOKEN) |
+| 📝 备忘录 | 增删列表 | CF KV `memos` |
+| 📌 便利贴 | 彩色便签墙，增删 | CF KV `notes` |
+| 📅 课表 | 多班级课表，格子编辑保存 | CF KV `scheds` |
 
 ## 部署
-1. CF 面板 → Workers & Pages → 创建 Worker → 粘贴 `_worker.js` 内容 → 部署
-2. 设置 → 变量和机密 → Secret: `GH_TOKEN` = GitHub token（有 tjsj 私有仓库读权限）
-3. 设置 → 自定义域（可选）如 `tjsj.zain-dev.top`
-4. 访问即可浏览
+1. CF 面板 → 创建 Worker → 粘贴 `_worker.js` → 部署
+2. **设置 → 绑定 → KV Namespace**（创建三个）：`memos` / `notes` / `scheds`
+3. **设置 → 变量 → Secret**：`GH_TOKEN` = GitHub token（读 tjsj-document-together 权限）
+4. **设置 → 自定义域** → `st.zain-dev.top`
+5. 建议：Cloudflare Access 登录保护（社团内部用，免费 50 人）
 
-## 安全建议
-- 文档保密 → 用 Cloudflare Access 给 Worker 加登录保护（免费 50 人）
+## 安全
+- 私有仓库内容只经 Worker 中转，token 在 Secret 不外泄
+- 建议加 Access 保护防止外部访问
